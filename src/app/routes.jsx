@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createHashRouter, Navigate } from "react-router";
 import { GameLayout } from "./layouts/GameLayout";
 import { LoadingScreen } from "./screens/LoadingScreen";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -7,7 +7,7 @@ import { TechnologiesScreen } from "./screens/TechnologiesScreen";
 import { ExperienceScreen } from "./screens/ExperienceScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: "/",
     Component: GameLayout,

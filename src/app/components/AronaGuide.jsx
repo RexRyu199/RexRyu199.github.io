@@ -1,49 +1,95 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router";
 
+// Detecta si estamos en viewport móvil (breakpoint sm de Tailwind = 640px)
+// y se actualiza si el usuario rota el dispositivo o redimensiona la ventana.
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e) => setIsMobile(e.matches);
+    handler(mql);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export function AronaGuide() {
   const location = useLocation();
-  
+  const isMobile = useIsMobile();
+
   // Estados principales
   const [dialogue, setDialogue] = useState("");
   const [isIntro, setIsIntro] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  
+
   // Nuevos estados para la animación y emociones
-  const [emotion, setEmotion] = useState("normal"); // "normal", "blushing", "smug", "surprised"
+  const [emotion, setEmotion] = useState("normal");
   const [isTalking, setIsTalking] = useState(false);
   const [mouthOpen, setMouthOpen] = useState(false);
 
-  // Efecto que controla la animación de hablar cada vez que cambia el diálogo
+  // Solo en móvil: controla si el globo de texto se muestra o ya se auto-ocultó.
+  // En desktop esto no se usa, el globo se comporta exactamente como antes.
+  const [bubbleVisible, setBubbleVisible] = useState(true);
+  const autoHideRef = useRef(null);
+
+  const AVATAR_PX = isMobile ? 56 : 80;
+  const INTRO_SCALE = isMobile ? 2.3 : 3.5;
+  const introHalf = (AVATAR_PX * INTRO_SCALE) / 2;
+
+  const bubblePos = isIntro
+    ? { x: isMobile ? 64 : 120, y: isMobile ? -168 : -290 }
+    : { x: isMobile ? 12 : 20, y: isMobile ? -64 : -90 };
+
+  // Animación de "hablar" (sin cambios respecto a tu versión)
   useEffect(() => {
     if (!dialogue) return;
 
     setIsTalking(true);
     setMouthOpen(true);
 
-    // Alternar la boca cada 200 milisegundos
     const talkInterval = setInterval(() => {
       setMouthOpen((prev) => !prev);
     }, 200);
 
-    // Calcular cuánto tiempo debe hablar basado en la longitud del texto
-    // (Aproximadamente 50ms por letra, mínimo 1.5s, máximo 4s)
     const duration = Math.min(Math.max(dialogue.length * 50, 1500), 4000);
 
-    // Detener la animación de hablar después del tiempo calculado
     const stopTimeout = setTimeout(() => {
       clearInterval(talkInterval);
       setIsTalking(false);
-      setMouthOpen(false); // Asegurarse de cerrar la boca al terminar
+      setMouthOpen(false);
     }, duration);
 
-    // Limpieza: si el diálogo cambia antes de que termine, resetea los contadores
     return () => {
       clearInterval(talkInterval);
       clearTimeout(stopTimeout);
     };
   }, [dialogue]);
+
+  // Solo en móvil: cada vez que hay un diálogo nuevo, se muestra y luego
+  // se auto-oculta unos segundos después de que Arona termina de "hablar",
+  // así deja de tapar contenido en vez de quedarse ahí para siempre.
+  useEffect(() => {
+    if (!isMobile || !dialogue) return;
+
+    setBubbleVisible(true);
+    if (autoHideRef.current) clearTimeout(autoHideRef.current);
+
+    const talkDuration = Math.min(Math.max(dialogue.length * 50, 1500), 4000);
+    const hideAfter = talkDuration + 1200; // un respiro extra para alcanzar a leer
+
+    autoHideRef.current = setTimeout(() => {
+      setBubbleVisible(false);
+    }, hideAfter);
+
+    return () => clearTimeout(autoHideRef.current);
+  }, [dialogue, isMobile]);
 
   // Manejo de rutas y sus emociones iniciales
   useEffect(() => {
@@ -75,7 +121,6 @@ export function AronaGuide() {
   }, [location.pathname]);
 
   const handleAronaClick = () => {
-    // Convertimos el arreglo en objetos para asignar una emoción a cada frase
     const reactions = [
       { text: "¡Jajaja! ¡Haces cosquillas!", emotion: "blushing" },
       { text: "¿Estás buscando algo específico? Te recomiendo visitar la sección de Proyectos.", emotion: "normal" },
@@ -94,21 +139,21 @@ export function AronaGuide() {
     ];
 
     const currentReaction = reactions[clickCount % reactions.length];
-    
+
     setEmotion(currentReaction.emotion);
     setDialogue(currentReaction.text);
+    setBubbleVisible(true); // si estaba oculto en móvil, reaparece al tocarla
     setClickCount(prev => prev + 1);
   };
 
-  // Función para determinar qué imagen renderizar
   const getAronaImage = () => {
     switch (emotion) {
       case "blushing":
         return isTalking && mouthOpen ? "/aronaSonrojaHabla.png" : "/aronaSonroja.png";
       case "smug":
-        return "/aronaSmug.png"; // No tiene variante hablando
+        return "/aronaSmug.png";
       case "surprised":
-        return "/aronasorprendida.png"; // No tiene variante hablando
+        return "/aronasorprendida.png";
       case "sleep":
         return "/aronaDormida.png";
       case "normal":
@@ -117,32 +162,43 @@ export function AronaGuide() {
     }
   };
 
+  // En desktop el globo se muestra siempre que haya diálogo (como antes).
+  // En móvil, además necesita que bubbleVisible siga en true.
+  const showBubble = Boolean(dialogue) && (!isMobile || bubbleVisible);
+
   return (
-    <div className="fixed bottom-8 left-8 z-50 flex items-end pointer-events-none">
+    <div
+      className={`fixed z-50 flex items-end pointer-events-none ${
+        isMobile ? "bottom-3 left-2" : "bottom-8 left-8"
+      }`}
+    >
       <motion.div
         className="relative pointer-events-none"
         initial={false}
         animate={{
-          x: isIntro ? "calc(50vw - 172px)" : "0px",
-          y: isIntro ? "calc(-46vh + 172px)" : "0px",
+          x: isIntro ? `calc(50vw - ${introHalf}px)` : "0px",
+          y: isIntro ? `calc(-46vh + ${introHalf}px)` : "0px",
         }}
         transition={{ type: "spring", stiffness: 50, damping: 15, mass: 1 }}
       >
 
         {/* Globo de Texto */}
         <AnimatePresence>
-          {dialogue && (
+          {showBubble && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{
                 opacity: 1,
                 scale: 1,
-                x: isIntro ? 120 : 20,
-                y: isIntro ? -290 : -90
+                x: bubblePos.x,
+                y: bubblePos.y,
               }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ type: "spring", stiffness: 100, damping: 12 }}
-              className="absolute bottom-0 left-0 bg-white text-foreground px-4 py-3 rounded-2xl shadow-xl w-60 text-sm border border-blue-200 pointer-events-auto origin-bottom-left"
+              onClick={() => isMobile && setBubbleVisible(false)}
+              className={`absolute bottom-0 left-0 bg-white text-foreground px-4 py-3 rounded-2xl shadow-xl text-sm border border-blue-200 pointer-events-auto origin-bottom-left max-w-[70vw] ${
+                isMobile ? "w-40 text-[11px] leading-snug px-3 py-2 cursor-pointer" : "w-60"
+              }`}
             >
               <p className="font-medium text-slate-700 leading-tight">{dialogue}</p>
               <div className="absolute -bottom-2 left-6 w-4 h-4 bg-white transform rotate-45 border-b border-r border-blue-200"></div>
@@ -153,17 +209,18 @@ export function AronaGuide() {
         {/* Personaje */}
         <motion.div
           className="pointer-events-auto cursor-pointer origin-bottom-left"
-          animate={{ scale: isIntro ? 3.5 : 1 }}
-          whileHover={{ scale: isIntro ? 3.6 : 1.1, y: -5 }}
-          whileTap={{ scale: isIntro ? 3.4 : 0.95 }}
+          animate={{ scale: isIntro ? INTRO_SCALE : 1 }}
+          whileHover={{ scale: isIntro ? INTRO_SCALE + 0.1 : 1.1, y: -5 }}
+          whileTap={{ scale: isIntro ? INTRO_SCALE - 0.1 : 0.95 }}
           transition={{ type: "spring", stiffness: 100, damping: 15 }}
           onClick={handleAronaClick}
         >
-          {/* Aquí inyectamos la imagen dinámica */}
           <img
             src={getAronaImage()}
             alt="Guía Arona"
-            className="w-20 h-20 object-contain drop-shadow-xl pointer-events-none select-none"
+            className={`object-contain drop-shadow-xl pointer-events-none select-none ${
+              isMobile ? "w-14 h-14" : "w-20 h-20"
+            }`}
             draggable="false"
           />
         </motion.div>
