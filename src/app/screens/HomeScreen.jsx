@@ -4,39 +4,10 @@ import { useNavigate } from "react-router";
 import { User, FolderKanban, Clock, Cpu, Wifi, BatteryFull } from "lucide-react";
 
 const APPS = [
-  {
-    id: "profile",
-    label: "Perfil",
-    icon: User,
-    path: "/profile",
-    gradient: "from-sky-400 to-blue-600",
-    glow: "shadow-blue-500/40",
-  },
-  {
-    id: "projects",
-    label: "Proyectos",
-    icon: FolderKanban,
-    path: "/projects",
-    gradient: "from-amber-400 to-orange-600",
-    glow: "shadow-orange-500/40",
-    badge: "8",
-  },
-  {
-    id: "technologies",
-    label: "Tecnologías",
-    icon: Cpu,
-    path: "/technologies",
-    gradient: "from-emerald-400 to-teal-600",
-    glow: "shadow-emerald-500/40",
-  },
-  {
-    id: "experience",
-    label: "Experiencia",
-    icon: Clock,
-    path: "/experience",
-    gradient: "from-fuchsia-400 to-pink-600",
-    glow: "shadow-pink-500/40",
-  },
+  { id: "profile", label: "Perfil", icon: User, path: "/profile", gradient: "from-sky-400 to-blue-600", glow: "shadow-blue-500/40" },
+  { id: "projects", label: "Proyectos", icon: FolderKanban, path: "/projects", gradient: "from-amber-400 to-orange-600", glow: "shadow-orange-500/40", badge: "8" },
+  { id: "technologies", label: "Tecnologías", icon: Cpu, path: "/technologies", gradient: "from-emerald-400 to-teal-600", glow: "shadow-emerald-500/40" },
+  { id: "experience", label: "Experiencia", icon: Clock, path: "/experience", gradient: "from-fuchsia-400 to-pink-600", glow: "shadow-pink-500/40" },
 ];
 
 const STATS = [
@@ -71,11 +42,15 @@ export function HomeScreen() {
   const time = useLiveClock();
 
   return (
-    <div className="w-full h-full flex flex-col justify-between pt-6 pb-8 px-6 md:px-12 relative pointer-events-auto">
+    // Antes no tenía overflow-y-auto: si el contenido (barra + widgets + dock)
+    // no cabía en pantallas cortas, simplemente se recortaba sin forma de
+    // hacer scroll para verlo. También agregué padding-bottom con
+    // env(safe-area-inset-bottom) para que el dock no quede pegado al borde
+    // físico en teléfonos con "home indicator" (iPhone sin botón).
+    <div className="w-full h-full flex flex-col justify-between pt-6 pb-[calc(2rem+env(safe-area-inset-bottom))] px-6 md:px-12 relative pointer-events-auto overflow-y-auto">
 
-      {/* ===== Barra de estado (system bar) ===== */}
       <motion.div
-        className="w-full flex justify-between items-center"
+        className="w-full flex justify-between items-center flex-shrink-0"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4 }}
@@ -91,9 +66,8 @@ export function HomeScreen() {
         </div>
       </motion.div>
 
-      {/* ===== Widgets: estado del sistema + stats ===== */}
       <motion.div
-        className="w-full flex flex-col sm:flex-row justify-between items-start gap-4 mt-4"
+        className="w-full flex flex-col sm:flex-row justify-between items-start gap-4 mt-4 flex-shrink-0"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
@@ -132,12 +106,14 @@ export function HomeScreen() {
         </div>
       </motion.div>
 
-      {/* ===== Espacio central reservado para la mascota guía ===== */}
-      <div className="flex-1" />
+      {/* min-h en vez de flex-1 puro: dentro de un contenedor con scroll,
+          flex-1 podía colapsar a 0 si el contenido no alcanza a llenar la
+          pantalla; con un mínimo, sigue dando aire pero cede ante el scroll
+          cuando el contenido de arriba/abajo necesita más espacio. */}
+      <div className="flex-1 min-h-6" />
 
-      {/* ===== Dock de apps ===== */}
       <motion.div
-        className="w-full flex justify-center"
+        className="w-full flex justify-center flex-shrink-0"
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.4 }}

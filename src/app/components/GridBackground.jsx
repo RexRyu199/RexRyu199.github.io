@@ -1,23 +1,22 @@
 import { useState } from 'react'
 
-export function GridBackground() { // Renombrado para claridad
+export function GridBackground() {
   const [hovering, setHovering] = useState(false)
   const [cursor, setCursor] = useState({ x: 0, y: 0 })
 
-  const handlePointerMove = (event) => { // Eliminar tipo de evento
+  const handlePointerMove = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
     setCursor({ x: event.clientX - rect.left, y: event.clientY - rect.top })
   }
 
-  // The hover layer is the same dot grid scaled up, revealed only within a soft
-  // circle that follows the cursor — so dots appear to bloom under the pointer.
   const mask = `radial-gradient(circle at ${cursor.x}px ${cursor.y}px, #000 72px, transparent 120px)`
 
-  // Convert CSSProperties to generic objects
   const container = {
     position: 'relative',
     width: '100%',
-    minHeight: '100vh',
+    // 100vh -> 100dvh: mismo problema de altura fantasma en navegadores
+    // móviles que en GameLayout.
+    minHeight: '100dvh',
     overflow: 'hidden',
     backgroundColor: '#f8fbff',
   }

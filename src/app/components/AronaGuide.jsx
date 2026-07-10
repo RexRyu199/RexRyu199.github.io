@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router";
 
-// Detecta si estamos en viewport móvil (breakpoint sm de Tailwind = 640px)
-// y se actualiza si el usuario rota el dispositivo o redimensiona la ventana.
 function useIsMobile(breakpoint = 640) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < breakpoint : false
@@ -20,34 +18,56 @@ function useIsMobile(breakpoint = 640) {
   return isMobile;
 }
 
+// Nuevo: además de "ancho de pantalla", ahora también vigilamos la ALTURA.
+// Antes, si la ventana se hacía corta (celular en horizontal, ventana de
+// escritorio achicada), Arona seguía usando la misma escala grande de
+// "intro" pensada para pantallas altas, y terminaba tapando casi todo.
+function useViewportHeight() {
+  const [height, setHeight] = useState(
+    typeof window !== "undefined" ? window.innerHeight : 800
+  );
+
+  useEffect(() => {
+    const handler = () => setHeight(window.innerHeight);
+    window.addEventListener("resize", handler);
+    window.addEventListener("orientationchange", handler);
+    return () => {
+      window.removeEventListener("resize", handler);
+      window.removeEventListener("orientationchange", handler);
+    };
+  }, []);
+
+  return height;
+}
+
 export function AronaGuide() {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const viewportHeight = useViewportHeight();
+  const isShort = viewportHeight < 560; // pantalla corta: celular en horizontal, ventana chica
 
-  // Estados principales
   const [dialogue, setDialogue] = useState("");
   const [isIntro, setIsIntro] = useState(false);
   const [clickCount, setClickCount] = useState(0);
 
-  // Nuevos estados para la animación y emociones
   const [emotion, setEmotion] = useState("normal");
   const [isTalking, setIsTalking] = useState(false);
   const [mouthOpen, setMouthOpen] = useState(false);
 
-  // Solo en móvil: controla si el globo de texto se muestra o ya se auto-ocultó.
-  // En desktop esto no se usa, el globo se comporta exactamente como antes.
   const [bubbleVisible, setBubbleVisible] = useState(true);
   const autoHideRef = useRef(null);
 
-  const AVATAR_PX = isMobile ? 56 : 80;
-  const INTRO_SCALE = isMobile ? 2.3 : 3.5;
+  // Tamaño y escala ahora escalonados en 3 niveles (desktop / móvil / móvil
+  // + pantalla corta) en vez de solo 2, así nunca se queda "grande" cuando
+  // el espacio vertical disponible se reduce.
+  const AVATAR_PX = isMobile ? (isShort ? 44 : 56) : 80;
+  const INTRO_SCALE = isMobile ? (isShort ? 1.6 : 2.3) : 3.5;
   const introHalf = (AVATAR_PX * INTRO_SCALE) / 2;
 
   const bubblePos = isIntro
-    ? { x: isMobile ? 64 : 120, y: isMobile ? -168 : -290 }
-    : { x: isMobile ? 12 : 20, y: isMobile ? -64 : -90 };
+    ? { x: isMobile ? (isShort ? 44 : 64) : 120, y: isMobile ? (isShort ? -120 : -168) : -290 }
+    : { x: isMobile ? 12 : 20, y: isMobile ? (isShort ? -50 : -64) : -90 };
 
-  // Animación de "hablar" (sin cambios respecto a tu versión)
   useEffect(() => {
     if (!dialogue) return;
 
@@ -72,9 +92,6 @@ export function AronaGuide() {
     };
   }, [dialogue]);
 
-  // Solo en móvil: cada vez que hay un diálogo nuevo, se muestra y luego
-  // se auto-oculta unos segundos después de que Arona termina de "hablar",
-  // así deja de tapar contenido en vez de quedarse ahí para siempre.
   useEffect(() => {
     if (!isMobile || !dialogue) return;
 
@@ -82,7 +99,7 @@ export function AronaGuide() {
     if (autoHideRef.current) clearTimeout(autoHideRef.current);
 
     const talkDuration = Math.min(Math.max(dialogue.length * 50, 1500), 4000);
-    const hideAfter = talkDuration + 1200; // un respiro extra para alcanzar a leer
+    const hideAfter = talkDuration + 1200;
 
     autoHideRef.current = setTimeout(() => {
       setBubbleVisible(false);
@@ -91,7 +108,6 @@ export function AronaGuide() {
     return () => clearTimeout(autoHideRef.current);
   }, [dialogue, isMobile]);
 
-  // Manejo de rutas y sus emociones iniciales
   useEffect(() => {
     if (location.pathname === "/home" || location.pathname === "/") {
       setIsIntro(true);
@@ -142,7 +158,7 @@ export function AronaGuide() {
 
     setEmotion(currentReaction.emotion);
     setDialogue(currentReaction.text);
-    setBubbleVisible(true); // si estaba oculto en móvil, reaparece al tocarla
+    setBubbleVisible(true);
     setClickCount(prev => prev + 1);
   };
 
@@ -162,27 +178,32 @@ export function AronaGuide() {
     }
   };
 
-  // En desktop el globo se muestra siempre que haya diálogo (como antes).
-  // En móvil, además necesita que bubbleVisible siga en true.
   const showBubble = Boolean(dialogue) && (!isMobile || bubbleVisible);
 
   return (
     <div
+      // bottom-3 / left-2 ahora respetan env(safe-area-inset-*), y en
+      // pantallas cortas se acercan aún más a la esquina para robar el
+      // mínimo espacio posible.
       className={`fixed z-50 flex items-end pointer-events-none ${
-        isMobile ? "bottom-3 left-2" : "bottom-8 left-8"
+        isMobile
+          ? `bottom-[max(0.6rem,env(safe-area-inset-bottom))] left-[max(0.5rem,env(safe-area-inset-left))]`
+          : "bottom-8 left-8"
       }`}
     >
       <motion.div
         className="relative pointer-events-none"
         initial={false}
         animate={{
+          // vh -> dvh: mismo motivo que en GameLayout, para que el cálculo
+          // de centrado use la altura real visible en móvil, no la altura
+          // "fantasma" que incluye la barra de direcciones del navegador.
           x: isIntro ? `calc(50vw - ${introHalf}px)` : "0px",
-          y: isIntro ? `calc(-46vh + ${introHalf}px)` : "0px",
+          y: isIntro ? `calc(-46dvh + ${introHalf}px)` : "0px",
         }}
         transition={{ type: "spring", stiffness: 50, damping: 15, mass: 1 }}
       >
 
-        {/* Globo de Texto */}
         <AnimatePresence>
           {showBubble && (
             <motion.div
@@ -206,7 +227,6 @@ export function AronaGuide() {
           )}
         </AnimatePresence>
 
-        {/* Personaje */}
         <motion.div
           className="pointer-events-auto cursor-pointer origin-bottom-left"
           animate={{ scale: isIntro ? INTRO_SCALE : 1 }}
@@ -218,9 +238,8 @@ export function AronaGuide() {
           <img
             src={getAronaImage()}
             alt="Guía Arona"
-            className={`object-contain drop-shadow-xl pointer-events-none select-none ${
-              isMobile ? "w-14 h-14" : "w-20 h-20"
-            }`}
+            style={{ width: !isMobile ? 80 : AVATAR_PX, height: !isMobile ? 80 : AVATAR_PX }}
+            className="object-contain drop-shadow-xl pointer-events-none select-none"
             draggable="false"
           />
         </motion.div>

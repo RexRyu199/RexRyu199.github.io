@@ -3,7 +3,6 @@ import { useState, useCallback, useMemo, memo } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Code2, X, TerminalSquare } from "lucide-react";
 
-// Transiciones simplificadas para reducir la carga de renderizado
 const LAYOUT_TRANSITION = { type: "spring", bounce: 0, duration: 0.4 };
 const ENTER_TRANSITION = { duration: 0.3, ease: "easeOut" };
 
@@ -30,7 +29,7 @@ const PROJECTS = [
     technologies: "React, Vite, Tailwind CSS, Nginx, VPS Linux",
     category: "Web Frontend & VPS",
     status: "Completado",
-    image:"/projects/fitness.png", 
+    image: "/projects/fitness.png",
     description: "Plataforma web construida con React, Vite y Tailwind CSS (JSX en todos los componentes), enfocada en rendimiento. Hago uso intensivo de funciones asíncronas y Promise.all para paralelizar llamadas y mantener una UX fluida. El sistema está desplegado en un servidor VPS Linux propio, con Nginx configurado como proxy inverso.",
     details: [
       "Componentes en React + JSX, con Vite como bundler y Tailwind CSS para el diseño.",
@@ -79,7 +78,7 @@ const PROJECTS = [
     technologies: "Workflows, WhatsApp API, UX/UI",
     category: "Automatización",
     status: "Completado",
-    image: "/projects/crm.png", 
+    image: "/projects/crm.png",
     description: "Proyecto desarrollado para la empresa RH Accesos. Diseño de flujos de trabajo automatizados para atención al cliente y optimización de ventas de puertas de seguridad, con bots interactivos y conectores a través de la API oficial de WhatsApp Business.",
     details: [
       "Desarrollo de chatbots interactivos conectados a la API oficial de WhatsApp Business.",
@@ -108,11 +107,15 @@ const PROJECTS = [
   }
 ];
 
-// Componente optimizado estilo Widget de App
 const ProjectCard = memo(function ProjectCard({ project, index, isDevMode, onSelect }) {
   return (
     <motion.div
       layoutId={`card-container-${project.id}`}
+      layout="position" // Solo mide posición, no tamaño completo — mucho menos
+                         // sensible a la distorsión que provoca filter: blur()
+                         // en GameLayout durante la transición de página, que
+                         // era la causa real de que la tarjeta se quedara
+                         // "invisible" hasta hacer clic.
       onClick={() => onSelect(project.id)}
       className={`w-full aspect-square md:aspect-auto md:h-56 rounded-[2rem] p-5 md:p-6 cursor-pointer relative overflow-hidden shadow-lg group transition-colors duration-300 flex flex-col ${
         isDevMode ? 'bg-zinc-900 border border-zinc-700' : project.bg + ' hover:brightness-105'
@@ -120,7 +123,7 @@ const ProjectCard = memo(function ProjectCard({ project, index, isDevMode, onSel
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...ENTER_TRANSITION, delay: index * 0.04 }}
-      whileTap={{ scale: 0.96 }} // Efecto de pulsación ligero
+      whileTap={{ scale: 0.96 }}
     >
       {!isDevMode && <div className="absolute inset-0 bg-dots opacity-30 mix-blend-overlay pointer-events-none" />}
 
@@ -136,9 +139,9 @@ const ProjectCard = memo(function ProjectCard({ project, index, isDevMode, onSel
           <div className="bg-white/20 p-3 rounded-2xl w-fit text-white backdrop-blur-md shadow-sm">
             <Code2 size={28} strokeWidth={1.5} />
           </div>
-          
+
           <div className="mt-auto relative z-10 w-full">
-            <motion.h2 layoutId={`card-title-${project.id}`} transition={{ layout: LAYOUT_TRANSITION }} className="text-lg md:text-xl font-bold text-white drop-shadow-sm leading-tight mb-1">
+            <motion.h2 layoutId={`card-title-${project.id}`} layout="position" transition={{ layout: LAYOUT_TRANSITION }} className="text-lg md:text-xl font-bold text-white drop-shadow-sm leading-tight mb-1">
               {project.name}
             </motion.h2>
             <p className="text-[11px] md:text-xs font-semibold text-white/80 uppercase tracking-wider">
@@ -190,7 +193,8 @@ export function ProjectsScreen() {
         </button>
       </div>
 
-      {/* Título estilo App Store / SO */}
+      {/* Título estilo App Store / SO — vuelve al offset original (pensado
+          para que Arona no tape contenido, igual que en tus otras pantallas) */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -202,7 +206,8 @@ export function ProjectsScreen() {
         </h1>
       </motion.div>
 
-      {/* Grid estilo OS (Tableta) */}
+      {/* Grid estilo OS (Tableta) — de vuelta al gutter izquierdo original
+          que reserva espacio para Arona */}
       <div className="flex-1 w-full max-w-7xl overflow-y-auto pb-32 px-4 md:pl-64 md:pr-12 scrollbar-hide">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {PROJECTS.map((project, index) => (
@@ -230,6 +235,7 @@ export function ProjectsScreen() {
           >
             <motion.div
               layoutId={`card-container-${selectedProject.id}`}
+              layout="position"
               transition={LAYOUT_TRANSITION}
               className={`w-full max-w-3xl max-h-[85vh] rounded-[2rem] overflow-hidden shadow-2xl flex flex-col relative ${isDevMode ? 'bg-zinc-900' : 'bg-white'}`}
               onClick={(e) => e.stopPropagation()}
@@ -244,17 +250,22 @@ export function ProjectsScreen() {
               <motion.div className={`h-40 md:h-48 w-full relative overflow-hidden flex items-end px-6 md:px-8 shrink-0 ${!selectedProject.image ? (isDevMode ? 'bg-zinc-950 border-b border-zinc-800' : selectedProject.bg) : ''}`}>
                 {selectedProject.image && !isDevMode && (
                   <>
-                    <img src={selectedProject.image} alt={selectedProject.name} className="absolute inset-0 w-full h-full object-cover" />
+                    <img
+                      src={selectedProject.image}
+                      alt={selectedProject.name}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                   </>
                 )}
                 {!selectedProject.image && !isDevMode && <div className="absolute inset-0 bg-dots opacity-30 mix-blend-overlay pointer-events-none" />}
-                
+
                 <div className={`z-10 pb-6 ${isDevMode ? 'text-green-400' : 'text-white'} drop-shadow-md w-full`}>
                   <div className="font-mono font-bold text-xs mb-2 opacity-80 bg-white/20 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
                     {selectedProject.category}
                   </div>
-                  <motion.h2 layoutId={`card-title-${selectedProject.id}`} transition={LAYOUT_TRANSITION} className="text-2xl md:text-3xl font-black leading-tight max-w-[90%]">
+                  <motion.h2 layoutId={`card-title-${selectedProject.id}`} layout="position" transition={LAYOUT_TRANSITION} className="text-2xl md:text-3xl font-black leading-tight max-w-[90%]">
                     {selectedProject.name}
                   </motion.h2>
                 </div>
@@ -281,14 +292,14 @@ export function ProjectsScreen() {
 
                       {selectedProject.link && (
                         <a 
-                          href={selectedProject.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors w-full md:w-auto justify-center"
+                        href={selectedProject.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors"
                         >
-                          Abrir Sitio
+                        Visitar Sitio
                         </a>
-                      )}
+                    )}
                     </div>
 
                     <div>
